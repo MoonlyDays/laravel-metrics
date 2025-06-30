@@ -4,6 +4,8 @@ namespace MoonlyDays\LaravelMetrics;
 
 abstract class Metric
 {
+    protected static bool $unique = false;
+
     public static function name(): string
     {
         return basename(static::class);
@@ -41,6 +43,6 @@ abstract class Metric
 
     protected static function newQuery(): StatisticQuery
     {
-        return app(StatisticQuery::class)->name(static::name());
+        return app(StatisticQuery::class)->name(static::name())->unique(static::$unique);
     }
 }

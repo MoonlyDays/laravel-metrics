@@ -7,6 +7,7 @@ use Exception;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use MoonlyDays\LaravelMetrics\Models\StatisticEvent;
 
 class StatisticQuery
@@ -15,7 +16,9 @@ class StatisticQuery
 
     protected string $period = 'day';
 
-    protected string $aggregate = 'SUM';
+    protected string $aggregate = 'sum';
+
+    protected bool $unique = false;
 
     protected CarbonInterface $start;
 
@@ -32,7 +35,23 @@ class StatisticQuery
      */
     public function sum(): array
     {
-        return $this->getDataPoints('SUM');
+        return $this->aggregate('sum')->get();
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function count(): array
+    {
+        return $this->aggregate('count')->get();
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function avg(): array
+    {
+        return $this->aggregate('avg')->get();
     }
 
     protected function periods(): Collection
@@ -52,12 +71,12 @@ class StatisticQuery
     /**
      * @throws Exception
      */
-    protected function getDataPoints(string $function): array
+    public function get(): array
     {
         $dataPoints = StatisticEvent::query()
             ->select([
                 DB::raw($this->getPeriodSqlExpression('occurred_at').' as period'),
-                DB::raw("$function(value) as value"),
+                DB::raw($this->getAggregateSqlExpression('value', 'unique_key').' as value'),
             ])
             ->where('metric_type', $this->name)
             ->whereBetween('occurred_at', [$this->start, $this->end])
@@ -98,6 +117,20 @@ class StatisticQuery
         return $this;
     }
 
+    public function unique(bool $value = true): static
+    {
+        $this->unique = $value;
+
+        return $this;
+    }
+
+    public function aggregate(string $func): static
+    {
+        $this->aggregate = $func;
+
+        return $this;
+    }
+
     public function groupByYear(): static
     {
         return $this->groupBy('year');
@@ -126,6 +159,16 @@ class StatisticQuery
     public function groupByMinute(): static
     {
         return $this->groupBy('minute');
+    }
+
+    protected function getAggregateSqlExpression(string $valueColumn, $uniqueColumn)
+    {
+        $column = match ($this->aggregate) {
+            'count' => $this->unique ? "DISTINCT $uniqueColumn" : $valueColumn,
+            default => $valueColumn,
+        };
+
+        return Str::upper($this->aggregate).'('.$column.')';
     }
 
     protected function getPeriodSqlExpression(string $column): string
