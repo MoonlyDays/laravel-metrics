@@ -65,14 +65,14 @@ class StatisticQuery
     public function get(): array
     {
         $dataPoints = StatisticEvent::query()
-            ->select([
-                DB::raw($this->getPeriodSqlExpression('occurred_at').' as period'),
-                $this->period !== null ? DB::raw($this->getAggregateSqlExpression('value', 'unique_key').' as value') : null,
-            ])
+            ->select(DB::raw($this->getAggregateSqlExpression('value', 'unique_key').' as value'))
             ->where('metric_type', $this->name)
             ->whereBetween('occurred_at', [$this->start, $this->end])
-            ->when($this->period !== null, fn ($query) => $query->groupBy('period'))
-            ->pluck('value', 'period');
+            ->when(! is_null($this->period), function ($query) {
+                return $query
+                    ->groupBy('period')
+                    ->addSelect(DB::raw($this->getPeriodSqlExpression('occurred_at').' as period'));
+            })->pluck('value', 'period');
 
         return $this->periods()->map(fn (string $period) => [
             'period' => $period,
