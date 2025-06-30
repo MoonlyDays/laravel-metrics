@@ -126,7 +126,7 @@ class StatisticQuery
 
     public function aggregate(string $func): static
     {
-        $this->aggregate = $func;
+        $this->aggregate = Str::lower($func);
 
         return $this;
     }
@@ -161,8 +161,15 @@ class StatisticQuery
         return $this->groupBy('minute');
     }
 
-    protected function getAggregateSqlExpression(string $valueColumn, $uniqueColumn)
+    /**
+     * @throws Exception
+     */
+    protected function getAggregateSqlExpression(string $valueColumn, $uniqueColumn): string
     {
+        if ($this->unique && $this->aggregate !== 'count') {
+            throw new Exception('The unique option is only available for the count aggregate function.');
+        }
+
         $column = match ($this->aggregate) {
             'count' => $this->unique ? "DISTINCT $uniqueColumn" : $valueColumn,
             default => $valueColumn,
