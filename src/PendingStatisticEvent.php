@@ -13,8 +13,6 @@ class PendingStatisticEvent
 
     protected ?string $uniqueKey = null;
 
-    protected ?string $uniquePeriod = null;
-
     protected CarbonInterface $occurredAt;
 
     public function __construct()
@@ -43,52 +41,15 @@ class PendingStatisticEvent
         return $this;
     }
 
-    public function yearlyUnique(string $unique): static
-    {
-        return $this->unique($unique, 'year');
-    }
-
-    public function weeklyUnique(string $unique): static
-    {
-        return $this->unique($unique, 'week');
-    }
-
-    public function monthlyUnique(string $unique): static
-    {
-        return $this->unique($unique, 'month');
-    }
-
-    public function dailyUnique(string $unique): static
-    {
-        return $this->unique($unique, 'day');
-    }
-
-    public function hourlyUnique(string $unique): static
-    {
-        return $this->unique($unique, 'hour');
-    }
-
-    public function minutelyUnique(string $unique): static
-    {
-        return $this->unique($unique, 'minute');
-    }
-
-    public function unique(string $unique, string $period): static
+    public function unique(string $unique): static
     {
         $this->uniqueKey = $unique;
-        $this->uniquePeriod = $period;
 
         return $this;
     }
 
     public function save(): bool
     {
-        if (! is_null($existing = $this->existingUnique())) {
-            $existing->increment('value', $this->value);
-
-            return true;
-        }
-
         $event = new StatisticEvent;
         $event->metric_type = $this->name;
         $event->value = $this->value;
@@ -96,22 +57,6 @@ class PendingStatisticEvent
         $event->occurred_at = $this->occurredAt;
 
         return $event->save();
-    }
-
-    public function existingUnique()
-    {
-        if (is_null($this->uniqueKey)) {
-            return null;
-        }
-
-        $periodFrom = $this->occurredAt->copy()->startOf($this->uniquePeriod);
-        $periodTo = $periodFrom->copy()->endOf($this->uniquePeriod);
-
-        return StatisticEvent::query()
-            ->where('metric_type', $this->name)
-            ->where('unique_key', $this->uniqueKey)
-            ->whereBetween('occurred_at', [$periodFrom, $periodTo])
-            ->first();
     }
 
     public function __destruct()
