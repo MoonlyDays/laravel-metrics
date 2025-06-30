@@ -45,6 +45,9 @@ class StatisticQuery
         return $this->aggregate('avg')->get();
     }
 
+    /**
+     * @throws LaravelMetricsException
+     */
     protected function periods(): Collection
     {
         $data = collect();
