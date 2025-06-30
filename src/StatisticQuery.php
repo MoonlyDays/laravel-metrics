@@ -3,18 +3,18 @@
 namespace MoonlyDays\LaravelMetrics;
 
 use Carbon\CarbonInterface;
-use Exception;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use MoonlyDays\LaravelMetrics\Exceptions\LaravelMetricsException;
 use MoonlyDays\LaravelMetrics\Models\StatisticEvent;
 
 class StatisticQuery
 {
     protected string $name;
 
-    protected string $period = 'day';
+    protected ?string $period = 'day';
 
     protected string $aggregate = 'sum';
 
@@ -30,25 +30,16 @@ class StatisticQuery
         $this->end = now();
     }
 
-    /**
-     * @throws Exception
-     */
     public function sum(): array
     {
         return $this->aggregate('sum')->get();
     }
 
-    /**
-     * @throws Exception
-     */
     public function count(): array
     {
         return $this->aggregate('count')->get();
     }
 
-    /**
-     * @throws Exception
-     */
     public function avg(): array
     {
         return $this->aggregate('avg')->get();
@@ -69,18 +60,18 @@ class StatisticQuery
     }
 
     /**
-     * @throws Exception
+     * @throws LaravelMetricsException
      */
     public function get(): array
     {
         $dataPoints = StatisticEvent::query()
             ->select([
                 DB::raw($this->getPeriodSqlExpression('occurred_at').' as period'),
-                DB::raw($this->getAggregateSqlExpression('value', 'unique_key').' as value'),
+                $this->period !== null ? DB::raw($this->getAggregateSqlExpression('value', 'unique_key').' as value') : null,
             ])
             ->where('metric_type', $this->name)
             ->whereBetween('occurred_at', [$this->start, $this->end])
-            ->groupBy('period')
+            ->when($this->period !== null, fn ($query) => $query->groupBy('period'))
             ->pluck('value', 'period');
 
         return $this->periods()->map(fn (string $period) => [
@@ -110,7 +101,7 @@ class StatisticQuery
         return $this;
     }
 
-    public function groupBy(string $period): static
+    public function groupBy(?string $period): static
     {
         $this->period = $period;
 
@@ -162,12 +153,12 @@ class StatisticQuery
     }
 
     /**
-     * @throws Exception
+     * @throws LaravelMetricsException
      */
     protected function getAggregateSqlExpression(string $valueColumn, $uniqueColumn): string
     {
         if ($this->unique && $this->aggregate !== 'count') {
-            throw new Exception('The unique option is only available for the count aggregate function.');
+            throw new LaravelMetricsException('The unique option is only available for the count aggregate function.');
         }
 
         $column = match ($this->aggregate) {
@@ -178,8 +169,15 @@ class StatisticQuery
         return Str::upper($this->aggregate).'('.$column.')';
     }
 
+    /**
+     * @throws LaravelMetricsException
+     */
     protected function getPeriodSqlExpression(string $column): string
     {
+        if (is_null($this->period)) {
+            throw new LaravelMetricsException('getPeriodSqlExpression called with null period.');
+        }
+
         $dbDriver = app(StatisticEvent::class)->getConnection()->getDriverName();
 
         if ($dbDriver === 'pgsql') {
