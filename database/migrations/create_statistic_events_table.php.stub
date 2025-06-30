@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('statistic_events', function (Blueprint $table) {
+            $table->id();
+            $table->string('metric_type');
+            $table->integer('value');
+            $table->string('unique_key')->nullable();
+            $table->nullableMorphs('causer');
+            $table->nullableMorphs('for');
+            $table->dateTime('occurred_at');
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('statistic_events');
+    }
+};
