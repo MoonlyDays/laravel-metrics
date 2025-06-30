@@ -3,7 +3,6 @@
 namespace MoonlyDays\LaravelMetrics;
 
 use Carbon\CarbonInterface;
-use Illuminate\Support\Carbon;
 use MoonlyDays\LaravelMetrics\Models\StatisticEvent;
 
 class PendingStatisticEvent
@@ -105,7 +104,7 @@ class PendingStatisticEvent
             return null;
         }
 
-        $periodFrom = Carbon::parse($this->occurredAt)->startOf($this->uniquePeriod);
+        $periodFrom = $this->occurredAt->copy()->startOf($this->uniquePeriod);
         $periodTo = $periodFrom->copy()->endOf($this->uniquePeriod);
 
         return StatisticEvent::query()
