@@ -17,8 +17,6 @@ class StatisticQuery
 
     protected string $aggregate = 'SUM';
 
-    protected bool $unique;
-
     protected CarbonInterface $start;
 
     protected CarbonInterface $end;
