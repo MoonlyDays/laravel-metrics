@@ -84,7 +84,7 @@ class PendingStatisticEvent
 
     public function save(): bool
     {
-        if (is_null($existing = $this->existingUnique())) {
+        if (! is_null($existing = $this->existingUnique())) {
             $existing->increment('value', $this->value);
 
             return true;
