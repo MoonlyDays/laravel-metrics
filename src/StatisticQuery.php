@@ -64,20 +64,28 @@ class StatisticQuery
      */
     public function get(): array
     {
-        $dataPoints = StatisticEvent::query()
-            ->select(DB::raw($this->getAggregateSqlExpression('value', 'unique_key').' as value'))
+        $query = StatisticEvent::query()
             ->where('metric_type', $this->name)
             ->whereBetween('occurred_at', [$this->start, $this->end])
-            ->when(! is_null($this->period), function ($query) {
-                return $query
-                    ->groupBy('period')
-                    ->addSelect(DB::raw($this->getPeriodSqlExpression('occurred_at').' as period'));
-            })->pluck('value', 'period');
+            ->select(DB::raw($this->getAggregateSqlExpression('value', 'unique_key').' as value'));
 
-        return $this->periods()->map(fn (string $period) => [
-            'period' => $period,
-            'value' => intval($dataPoints->get($period, 0)),
-        ])->toArray();
+        if (! is_null($this->period)) {
+            $dataPoints = $query->groupBy('period')
+                ->addSelect(DB::raw($this->getPeriodSqlExpression('occurred_at').' as period'))
+                ->pluck('value', 'period');
+
+            $dataPoints = $this->periods()->map(fn (string $period) => [
+                'period' => $period,
+                'value' => intval($dataPoints->get($period, 0)),
+            ])->toArray();
+        } else {
+            $dataPoints = [
+                'period' => $this->start->toDateString().' - '.$this->end->toDateString(),
+                'value' => intval($query->get()->first()['value']),
+            ];
+        }
+
+        return $dataPoints;
     }
 
     public function name(string $name): static
@@ -214,6 +222,10 @@ class StatisticQuery
 
     protected function getPeriodTimestampFormat(): string
     {
+        if (is_null($this->period)) {
+            throw new LaravelMetricsException('getPeriodTimestampFormat called with null period.');
+        }
+
         return match ($this->period) {
             'year' => 'Y',
             'month' => 'Y-m',
