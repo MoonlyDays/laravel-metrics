@@ -16,6 +16,7 @@ class LaravelMetricsServiceProvider extends PackageServiceProvider
          */
         $package
             ->name('laravel-metrics')
-            ->hasMigration('create_statistic_events_table');
+            ->hasMigration('create_statistic_events_table')
+            ->hasMigration('update_statistic_parameters');
     }
 }

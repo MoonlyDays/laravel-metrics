@@ -3,6 +3,7 @@
 namespace MoonlyDays\LaravelMetrics;
 
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,9 @@ class StatisticQuery
 
     protected string $aggregate = 'sum';
 
-    protected bool $unique = false;
+    protected ?string $uniqueBy = null;
+
+    protected Builder $builder;
 
     protected CarbonInterface $start;
 
@@ -26,23 +29,38 @@ class StatisticQuery
 
     public function __construct()
     {
+        $this->builder = StatisticEvent::query();
         $this->start = now()->subMonth();
         $this->end = now();
     }
 
+    /**
+     * @throws LaravelMetricsException
+     */
     public function sum(): array
     {
         return $this->aggregate('sum')->get();
     }
 
+    /**
+     * @throws LaravelMetricsException
+     */
     public function count(): array
     {
         return $this->aggregate('count')->get();
     }
 
+    /**
+     * @throws LaravelMetricsException
+     */
     public function avg(): array
     {
         return $this->aggregate('avg')->get();
+    }
+
+    public function where(callable $closure): static
+    {
+        return $this;
     }
 
     /**
@@ -69,8 +87,12 @@ class StatisticQuery
     {
         $query = StatisticEvent::query()
             ->where('metric_type', $this->name)
+            ->when(
+                ! empty($this->whereConstraints),
+                fn ($builder) => $builder->whereJsonContains('parameters', $this->whereConstraints)
+            )
             ->whereBetween('occurred_at', [$this->start, $this->end])
-            ->select(DB::raw($this->getAggregateSqlExpression('value', 'unique_key').' as value'));
+            ->select(DB::raw($this->getAggregateSqlExpression('value').' as value'));
 
         if (! is_null($this->period)) {
             $dataPoints = $query->groupBy('period')
@@ -119,9 +141,9 @@ class StatisticQuery
         return $this;
     }
 
-    public function unique(bool $value = true): static
+    public function uniqueBy(?string $key): static
     {
-        $this->unique = $value;
+        $this->uniqueBy = $key;
 
         return $this;
     }
@@ -166,18 +188,25 @@ class StatisticQuery
     /**
      * @throws LaravelMetricsException
      */
-    protected function getAggregateSqlExpression(string $valueColumn, $uniqueColumn): string
+    protected function getAggregateSqlExpression(string $valueColumn): string
     {
-        if ($this->unique && $this->aggregate !== 'count') {
-            throw new LaravelMetricsException('The unique option is only available for the count aggregate function.');
+        if ($this->uniqueBy && $this->aggregate !== 'count') {
+            throw new LaravelMetricsException($this->aggregate.' aggregate is unavailable when unique by constraint is set.');
         }
 
         $column = match ($this->aggregate) {
-            'count' => $this->unique ? "DISTINCT $uniqueColumn" : $valueColumn,
+            'count' => $this->uniqueBy
+                ? 'DISTINCT '.$this->getExtractUniqueKeySqlExpression('parameters', $this->uniqueBy)
+                : $valueColumn,
             default => $valueColumn,
         };
 
         return Str::upper($this->aggregate).'('.$column.')';
+    }
+
+    protected function getExtractUniqueKeySqlExpression(string $parametersColumn, string $uniqueKey): string
+    {
+        return "JSON_EXTRACT(`$parametersColumn`, \"$.$uniqueKey\")";
     }
 
     /**
@@ -223,6 +252,9 @@ class StatisticQuery
         };
     }
 
+    /**
+     * @throws LaravelMetricsException
+     */
     protected function getPeriodTimestampFormat(): string
     {
         if (is_null($this->period)) {

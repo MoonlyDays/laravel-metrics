@@ -3,17 +3,22 @@
 namespace MoonlyDays\LaravelMetrics;
 
 use Carbon\CarbonInterface;
+use Illuminate\Support\Traits\Conditionable;
 use MoonlyDays\LaravelMetrics\Models\StatisticEvent;
 
 class PendingStatisticEvent
 {
+    use Conditionable;
+
     protected string $name = '';
 
     protected int $value = 0;
 
-    protected ?string $uniqueKey = null;
+    protected array $parameters = [];
 
     protected CarbonInterface $occurredAt;
+
+    protected bool $savePerformed = false;
 
     public function __construct()
     {
@@ -41,9 +46,20 @@ class PendingStatisticEvent
         return $this;
     }
 
-    public function unique(string $unique): static
+    public function with(mixed $key, mixed $value = null): static
     {
-        $this->uniqueKey = $unique;
+        if (func_num_args() == 1) {
+            $this->parameters = $key;
+
+            return $this;
+        }
+
+        return $this->set($key, $value);
+    }
+
+    public function set(string $key, mixed $value): static
+    {
+        $this->parameters[$key] = $value;
 
         return $this;
     }
@@ -53,14 +69,20 @@ class PendingStatisticEvent
         $event = new StatisticEvent;
         $event->metric_type = $this->name;
         $event->value = $this->value;
-        $event->unique_key = $this->uniqueKey;
         $event->occurred_at = $this->occurredAt;
+        $event->parameters = $this->parameters;
+
+        $this->savePerformed = true;
 
         return $event->save();
     }
 
     public function __destruct()
     {
+        if ($this->savePerformed) {
+            return;
+        }
+
         $this->save();
     }
 }

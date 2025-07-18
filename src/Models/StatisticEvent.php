@@ -11,6 +11,7 @@ class StatisticEvent extends Model
     {
         return [
             'occurred_at' => 'datetime',
+            'parameters' => 'array',
         ];
     }
 
