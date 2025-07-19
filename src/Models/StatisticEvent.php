@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class StatisticEvent extends Model
 {
+    public $timestamps = false;
+
     protected function casts(): array
     {
         return [

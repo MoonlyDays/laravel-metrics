@@ -16,7 +16,7 @@ return new class extends Migration
             $table->nullableMorphs('causer');
             $table->nullableMorphs('for');
             $table->dateTime('occurred_at');
-            $table->timestamps();
+            $table->json('parameters');
         });
     }
 
