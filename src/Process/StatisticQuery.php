@@ -42,6 +42,10 @@ class StatisticQuery
 
     protected bool $useCache = true;
 
+    protected bool $includeTotal = false;
+
+    protected string $totalPeriod = 'Total';
+
     protected CarbonInterval $cacheFor;
 
     protected CarbonInterface $start;
@@ -68,6 +72,16 @@ class StatisticQuery
     public function avg(): array
     {
         return $this->aggregate('avg')->get();
+    }
+
+    public function min(): array
+    {
+        return $this->aggregate('min')->get();
+    }
+
+    public function max(): array
+    {
+        return $this->aggregate('max')->get();
     }
 
     public function metric(Metric $metric): self
@@ -325,10 +339,19 @@ class StatisticQuery
             ->addSelect(DB::raw($this->getPeriodSqlExpression('occurred_at').' as period'))
             ->pluck('value', 'period');
 
-        return $this->periods()->map(fn (string $period) => [
+        $dataPoints = $this->periods()->map(fn (string $period) => [
             'period' => $period,
             'value' => intval($dataPoints->get($period, 0)),
-        ])->toArray();
+        ]);
+
+        if ($this->includeTotal) {
+            $dataPoints->push([
+                'period' => $this->totalPeriod,
+                'value' => $this->rollupTotal($dataPoints),
+            ]);
+        }
+
+        return $dataPoints->toArray();
     }
 
     public function __call(string $name, array $arguments)
@@ -384,6 +407,7 @@ class StatisticQuery
         return implode(':', [
             'statistics',
             $this->aggregate,
+            $this->includeTotal,
             $this->metric->name(),
             $this->uniqueBy,
             $this->start->toDateTimeString(),
@@ -400,5 +424,25 @@ class StatisticQuery
             json_encode($constraint['value']),
             $constraint['boolean'] == 'and' ? '&' : '|',
         ])));
+    }
+
+    protected function rollupTotal(Collection $dataPoints): float|int
+    {
+        $values = $dataPoints->pluck('value')->all();
+
+        return match (Str::lower($this->aggregate)) {
+            'sum', 'count' => array_sum($values),
+            'avg' => array_sum($values) / count($values),
+            'min' => min($values),
+            'max' => max($values),
+        };
+    }
+
+    public function includeTotal(bool $use = true, string $total = 'Total'): self
+    {
+        $this->includeTotal = $use;
+        $this->totalPeriod = $total;
+
+        return $this;
     }
 }
