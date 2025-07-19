@@ -156,11 +156,21 @@ class StatisticQuery
         return $this->groupBy('minute');
     }
 
+    /**
+     * @throws LaravelMetricsException
+     */
     protected function getAggregateSqlExpression(string $valueColumn): string
     {
-        $column = $this->uniqueBy
-            ? 'DISTINCT '.$this->getExtractUniqueKeySqlExpression('parameters', $this->uniqueBy)
-            : $valueColumn;
+        if ($this->uniqueBy && $this->aggregate !== 'count') {
+            throw new LaravelMetricsException($this->aggregate.' aggregate is unavailable when unique by constraint is set.');
+        }
+
+        $column = match ($this->aggregate) {
+            'count' => $this->uniqueBy
+                ? 'DISTINCT '.$this->getExtractUniqueKeySqlExpression('parameters', $this->uniqueBy)
+                : $valueColumn,
+            default => $valueColumn,
+        };
 
         return Str::upper($this->aggregate).'('.$column.')';
     }
@@ -415,6 +425,7 @@ class StatisticQuery
             $this->includeTotal,
             $this->metric->name(),
             $this->uniqueBy,
+            $this->period,
             $this->start->toDateTimeString(),
             $this->end->toDateTimeString(),
             $this->buildWhereConstraintsString(),
@@ -435,7 +446,7 @@ class StatisticQuery
     {
         $values = $dataPoints->pluck('value')->all();
 
-        return match (Str::lower($this->aggregate)) {
+        return match ($this->aggregate) {
             'sum', 'count' => array_sum($values),
             'avg' => array_sum($values) / count($values),
             'min' => min($values),
