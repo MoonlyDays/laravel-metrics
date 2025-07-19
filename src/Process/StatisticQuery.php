@@ -223,15 +223,8 @@ class StatisticQuery
         };
     }
 
-    /**
-     * @throws LaravelMetricsException
-     */
     protected function getPeriodTimestampFormat(): string
     {
-        if (is_null($this->period)) {
-            throw new LaravelMetricsException('getPeriodTimestampFormat called with null period.');
-        }
-
         return match ($this->period) {
             'year' => 'Y',
             'month' => 'Y-m',
@@ -239,6 +232,7 @@ class StatisticQuery
             'day' => 'Y-m-d',
             'hour' => 'Y-m-d H',
             'minute' => 'Y-m-d H:i',
+            default => 'Y-m-d H:i:s'
         };
     }
 
@@ -378,9 +372,6 @@ class StatisticQuery
         throw new BadMethodCallException;
     }
 
-    /**
-     * @throws LaravelMetricsException
-     */
     protected function periods(): Collection
     {
         $data = collect();
@@ -419,6 +410,8 @@ class StatisticQuery
 
     protected function makeResponseCacheKey(): string
     {
+        $format = $this->getPeriodTimestampFormat();
+
         return implode(':', [
             'statistics',
             $this->aggregate,
@@ -426,8 +419,8 @@ class StatisticQuery
             $this->metric->name(),
             $this->uniqueBy,
             $this->period,
-            $this->start->toDateTimeString(),
-            $this->end->toDateTimeString(),
+            $this->start->format($format),
+            $this->end->format($format),
             $this->buildWhereConstraintsString(),
         ]);
     }
