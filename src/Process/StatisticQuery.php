@@ -314,24 +314,21 @@ class StatisticQuery
     {
         $query = $this->statisticQuery()
             ->select(DB::raw($this->getAggregateSqlExpression('value').' as value'))
-            ->tap(function (Builder $query) {
-
-                $query->where(function (Builder $query) {
-                    foreach ($this->whereConstraints as $constraint) {
-                        $query->whereJsonContains(
-                            'parameters',
-                            [$constraint['column'] => $constraint['value']],
-                            $constraint['boolean'],
-                            $constraint['not']
-                        );
-                    }
-                });
-            });
+            ->tap(fn (Builder $query) => $query->where(function (Builder $query) {
+                foreach ($this->whereConstraints as $constraint) {
+                    $query->whereJsonContains(
+                        'parameters',
+                        [$constraint['column'] => $constraint['value']],
+                        $constraint['boolean'],
+                        $constraint['not']
+                    );
+                }
+            }));
 
         if (is_null($this->period)) {
             return [
                 'period' => $this->start->toDateString().' - '.$this->end->toDateString(),
-                'value' => intval($query->get()->first()['value']),
+                'value' => floatval($query->get()->first()['value']),
             ];
         }
 
@@ -341,7 +338,7 @@ class StatisticQuery
 
         $dataPoints = $this->periods()->map(fn (string $period) => [
             'period' => $period,
-            'value' => intval($dataPoints->get($period, 0)),
+            'value' => floatval($dataPoints->get($period, 0)),
         ]);
 
         if ($this->includeTotal) {
