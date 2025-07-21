@@ -9,7 +9,6 @@ use Carbon\CarbonInterval;
 use Carbon\Unit;
 use DateInterval;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -372,18 +371,42 @@ class StatisticQuery
         throw new BadMethodCallException;
     }
 
+    /**
+     * @throws LaravelMetricsException
+     */
     protected function periods(): Collection
     {
+        if (is_null($this->period)) {
+            throw new LaravelMetricsException('Periods method called with null period.');
+        }
+
         $data = collect();
-        $currentDateTime = (new Carbon($this->start))->startOf($this->period);
+        [$start, $end] = $this->range();
+        $currentDateTime = $start;
 
         do {
             $data->push($currentDateTime->format($this->getPeriodTimestampFormat()));
 
             $currentDateTime->add(1, $this->period);
-        } while ($currentDateTime->lt($this->end));
+        } while ($currentDateTime->lte($end));
 
         return $data;
+    }
+
+    /**
+     * @return array<CarbonInterface>
+     */
+    public function range(): array
+    {
+        $start = $this->start;
+        $end = $this->end;
+
+        if (! is_null($this->period)) {
+            $start = $start->startOf($this->period);
+            $end = $end->endOf($this->period);
+        }
+
+        return [$start, $end];
     }
 
     public function useCache(bool $use = true): self
