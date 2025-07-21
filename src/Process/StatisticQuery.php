@@ -287,17 +287,9 @@ class StatisticQuery
 
     protected function statisticQuery(): Builder
     {
-        $start = $this->start;
-        $end = $this->end;
-
-        if (! is_null($this->period)) {
-            $start = $start->startOf($this->period);
-            $end = $end->endOf($this->period);
-        }
-
         return StatisticEvent::query()
             ->where('metric_type', $this->metric->name())
-            ->whereBetween('occurred_at', [$this->start, $this->end]);
+            ->whereBetween('occurred_at', $this->range());
     }
 
     public function get(): array
@@ -382,12 +374,12 @@ class StatisticQuery
 
         $data = collect();
         [$start, $end] = $this->range();
-        $currentDateTime = $start;
+        $currentDateTime = $start->toImmutable();
 
         do {
             $data->push($currentDateTime->format($this->getPeriodTimestampFormat()));
 
-            $currentDateTime->add(1, $this->period);
+            $currentDateTime = $currentDateTime->add(1, $this->period);
         } while ($currentDateTime->lte($end));
 
         return $data;
