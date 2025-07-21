@@ -60,7 +60,7 @@ class PendingStatisticEvent
         }
 
         $totallyGuarded = $this->metric->totallyGuarded();
-        $fillable = $this->metric->fillableFromArray($parameters);
+        $fillable = $this->metric->onlyFillable($parameters);
 
         foreach ($fillable as $key => $value) {
             if ($this->metric->isFillable($key)) {

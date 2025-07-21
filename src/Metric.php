@@ -27,6 +27,11 @@ abstract class Metric
         return false;
     }
 
+    public function onlyFillable(array $attributes)
+    {
+        return $this->fillableFromArray($attributes);
+    }
+
     public static function add(int $value): PendingStatisticEvent
     {
         return static::newEvent()->value($value);
